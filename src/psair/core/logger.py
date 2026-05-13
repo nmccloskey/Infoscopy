@@ -2,7 +2,9 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-import json
+from collections.abc import Callable
+
+from psair.core.provenance import capture_directory_snapshot, make_jsonable, write_json
 
 # ---------------------------------------------------------------------
 # Globals
@@ -19,6 +21,7 @@ logger.addHandler(console_handler)
 # Early-log buffer and root directory
 _early_logs: list[tuple[str, str]] = []
 _root_dir: Path | None = None
+_finalization_hooks: list[Callable[[dict], None]] = []
 
 
 # ---------------------------------------------------------------------
@@ -59,6 +62,16 @@ def flush_early_logs():
     _early_logs.clear()
 
 
+def add_finalization_hook(hook: Callable[[dict], None]) -> None:
+    """Register a callable to run during logger termination."""
+    _finalization_hooks.append(hook)
+
+
+def clear_finalization_hooks() -> None:
+    """Clear registered finalization hooks."""
+    _finalization_hooks.clear()
+
+
 def configure_file_handler(
     output_label: str = "",
     log_dir: Path | str | None = None,
@@ -74,12 +87,7 @@ def configure_file_handler(
     target_dir = Path(log_dir).resolve() if log_dir is not None else root / "logs"
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    safe_label = "".join(
-        char if char.isalnum() or char in {"_", "-"} else "_"
-        for char in output_label.strip().lower()
-    ).strip("_")
-    filename = f"{safe_label or 'run'}_{datetime.now().strftime('%y%m%d_%H%M')}.log"
-    log_path = (target_dir / filename).resolve()
+    log_path = (target_dir / "run_log.log").resolve()
 
     for handler in logger.handlers:
         if isinstance(handler, logging.FileHandler) and Path(handler.baseFilename) == log_path:
@@ -112,8 +120,7 @@ def initialize_logger(
 
     log_dir = out_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = start_time.strftime("%y%m%d_%H%M")
-    log_path = (log_dir / f"{program_name.lower()}_{timestamp}.log").resolve()
+    log_path = (log_dir / "run_log.log").resolve()
 
     file_handler = logging.FileHandler(log_path, encoding="utf-8")
     file_handler.setFormatter(formatter)
@@ -147,13 +154,6 @@ def record_run_metadata(
     """Record structured metadata including configuration and directory snapshots."""
     runtime_seconds = round((end_time - start_time).total_seconds(), 2)
 
-    def list_dir_structure(base: Path) -> dict:
-        files, folders = [], []
-        for p in sorted(base.rglob("*")):
-            rel = get_rel_path(p)
-            (folders if p.is_dir() else files).append(rel)
-        return {"base": get_rel_path(base), "folders": folders, "files": files}
-
     metadata = {
         "program": {
             "name": program_name,
@@ -168,20 +168,23 @@ def record_run_metadata(
             "output_dir": get_rel_path(output_dir),
             "config_file": get_rel_path(config_path),
         },
-        "configuration": config,
+        "configuration": make_jsonable(config),
         "directory_snapshot": {
-            "input_contents": list_dir_structure(input_dir),
-            "output_contents": list_dir_structure(output_dir),
+            "input_contents": capture_directory_snapshot(
+                input_dir,
+                root=get_root(),
+                include_file_stats=False,
+            ),
+            "output_contents": capture_directory_snapshot(
+                output_dir,
+                root=get_root(),
+                include_file_stats=False,
+            ),
         },
     }
 
-    meta_path = (
-        output_dir
-        / "logs"
-        / f"{program_name.lower()}_{start_time.strftime('%y%m%d_%H%M')}_metadata.json"
-    ).resolve()
-    with meta_path.open("w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
+    meta_path = (output_dir / "logs" / "run_metadata.json").resolve()
+    write_json(meta_path, metadata)
 
     logger.info(f"Run metadata saved at {get_rel_path(meta_path)}")
     return meta_path
@@ -195,6 +198,7 @@ def terminate_logger(
     start_time: datetime,
     program_name: str,
     version: str | None = None,
+    status: str = "completed",
 ):
     """Finalize logging: record metadata and close file handlers."""
     end_time = datetime.now()
@@ -204,18 +208,35 @@ def terminate_logger(
     )
     logger.info(f"Total runtime: {elapsed:.2f} seconds")
 
-    record_run_metadata(
-        input_dir=input_dir,
-        output_dir=output_dir,
-        config_path=config_path,
-        config=config,
-        start_time=start_time,
-        end_time=end_time,
-        program_name=program_name,
-        version=version,
-    )
+    context = {
+        "input_dir": input_dir,
+        "output_dir": output_dir,
+        "config_path": config_path,
+        "config": config,
+        "start_time": start_time,
+        "end_time": end_time,
+        "program_name": program_name,
+        "version": version,
+        "status": status,
+    }
 
-    for handler in logger.handlers[:]:
-        if isinstance(handler, logging.FileHandler):
-            handler.close()
-            logger.removeHandler(handler)
+    try:
+        record_run_metadata(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            config_path=config_path,
+            config=config,
+            start_time=start_time,
+            end_time=end_time,
+            program_name=program_name,
+            version=version,
+        )
+
+        for hook in list(_finalization_hooks):
+            hook(context)
+    finally:
+        clear_finalization_hooks()
+        for handler in logger.handlers[:]:
+            if isinstance(handler, logging.FileHandler):
+                handler.close()
+                logger.removeHandler(handler)

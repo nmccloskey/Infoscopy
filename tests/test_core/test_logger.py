@@ -14,6 +14,7 @@ from psair.core import logger as run_logger
 def reset_logger_state() -> None:
     run_logger._early_logs.clear()
     run_logger._root_dir = None
+    run_logger.clear_finalization_hooks()
     for handler in run_logger.logger.handlers[:]:
         if isinstance(handler, logging.FileHandler):
             handler.close()
@@ -23,6 +24,7 @@ def reset_logger_state() -> None:
 
     run_logger._early_logs.clear()
     run_logger._root_dir = None
+    run_logger.clear_finalization_hooks()
     for handler in run_logger.logger.handlers[:]:
         if isinstance(handler, logging.FileHandler):
             handler.close()
@@ -70,7 +72,7 @@ def test_initialize_logger_creates_log_file_and_flushes_early_logs(tmp_path: Pat
         version="1.2.3",
     )
 
-    assert log_path == (tmp_path / "output" / "logs" / "demorun_260420_1430.log")
+    assert log_path == (tmp_path / "output" / "logs" / "run_log.log")
     assert log_path.exists()
 
     text = log_path.read_text(encoding="utf-8")
@@ -87,7 +89,7 @@ def test_configure_file_handler_supports_legacy_output_manager_calls(tmp_path: P
     log_path = run_logger.configure_file_handler("Demo Run")
 
     assert log_path.parent == tmp_path / "logs"
-    assert log_path.name.startswith("demo_run_")
+    assert log_path.name == "run_log.log"
     assert log_path.exists()
     assert "legacy startup" in log_path.read_text(encoding="utf-8")
     assert run_logger._early_logs == []
@@ -147,6 +149,34 @@ def test_terminate_logger_records_metadata_and_removes_file_handlers(tmp_path: P
         version="0.0.1",
     )
 
-    metadata_files = list((output_dir / "logs").glob("demo_*_metadata.json"))
-    assert len(metadata_files) == 1
+    assert (output_dir / "logs" / "run_metadata.json").exists()
     assert not any(isinstance(handler, logging.FileHandler) for handler in run_logger.logger.handlers)
+
+
+def test_terminate_logger_runs_finalization_hooks(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    config_path = tmp_path / "config.yaml"
+    input_dir.mkdir()
+    output_dir.mkdir()
+    config_path.write_text("ok: true\n", encoding="utf-8")
+    start = datetime.now() - timedelta(seconds=1)
+    calls = []
+
+    run_logger.initialize_logger(start, output_dir, "Demo")
+    run_logger.add_finalization_hook(lambda context: calls.append(context))
+
+    run_logger.terminate_logger(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        config_path=config_path,
+        config={"ok": True},
+        start_time=start,
+        program_name="Demo",
+        version="0.0.1",
+        status="failed",
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["status"] == "failed"
+    assert calls[0]["output_dir"] == output_dir
