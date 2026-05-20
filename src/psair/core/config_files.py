@@ -12,7 +12,7 @@ class ConfigSource:
     """Description of where a sectioned configuration was loaded from."""
 
     kind: str
-    path: Path
+    path: Path | None
     files: dict[str, Path]
     missing_sections: list[str]
 
@@ -108,6 +108,50 @@ def merge_defaults(
         else:
             merged[key] = deepcopy(value)
     return merged
+
+
+def build_config_source_metadata(
+    source: ConfigSource | Mapping[str, Any] | None = None,
+    *,
+    kind: str | None = None,
+    path: str | Path | None = None,
+    files: Mapping[str, str | Path] | None = None,
+    missing_sections: Sequence[str] | None = None,
+    defaults_applied: bool | None = None,
+    default_path: str | Path | None = None,
+    extra: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Build JSON-ready metadata describing config source and defaults.
+
+    Applications can pass a ConfigSource returned by load_sectioned_config, a
+    similar mapping, or explicit keyword values. Keyword arguments override the
+    source values, which lets callers record post-merge missing/defaulted
+    sections without mutating the loader's source object.
+    """
+    metadata = _config_source_to_dict(source)
+
+    if kind is not None:
+        metadata["kind"] = kind
+    if path is not None or "path" not in metadata:
+        metadata["path"] = _path_value(path)
+    if files is not None or "files" not in metadata:
+        metadata["files"] = {
+            str(name): _path_value(file_path)
+            for name, file_path in (files or {}).items()
+        }
+    if missing_sections is not None or "missing_sections" not in metadata:
+        metadata["missing_sections"] = [
+            str(section) for section in (missing_sections or [])
+        ]
+    if defaults_applied is not None:
+        metadata["defaults_applied"] = bool(defaults_applied)
+    if default_path is not None:
+        metadata["default_path"] = _path_value(default_path)
+    if extra:
+        metadata.update(_json_ready_mapping(extra))
+
+    return metadata
 
 
 def load_sectioned_config(
@@ -240,3 +284,45 @@ def _load_nested_config_file(
 
 def _default_split_filenames(section_names: Sequence[str]) -> dict[str, str]:
     return {section_name: f"{section_name}.yaml" for section_name in section_names}
+
+
+def _config_source_to_dict(
+    source: ConfigSource | Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if source is None:
+        return {}
+    if isinstance(source, ConfigSource):
+        return {
+            "kind": source.kind,
+            "path": _path_value(source.path),
+            "files": {
+                str(name): _path_value(path)
+                for name, path in source.files.items()
+            },
+            "missing_sections": [str(section) for section in source.missing_sections],
+        }
+    if isinstance(source, Mapping):
+        return _json_ready_mapping(source)
+    raise TypeError("source must be a ConfigSource, mapping, or None.")
+
+
+def _json_ready_mapping(data: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): _json_ready_value(value) for key, value in data.items()}
+
+
+def _json_ready_value(value: Any) -> Any:
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, Mapping):
+        return _json_ready_mapping(value)
+    if isinstance(value, tuple):
+        return [_json_ready_value(item) for item in value]
+    if isinstance(value, list):
+        return [_json_ready_value(item) for item in value]
+    return value
+
+
+def _path_value(path: str | Path | None) -> str | None:
+    if path is None:
+        return None
+    return str(path)

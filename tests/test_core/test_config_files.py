@@ -6,6 +6,8 @@ import pytest
 import yaml
 
 from psair.core.config_files import (
+    ConfigSource,
+    build_config_source_metadata,
     load_sectioned_config,
     load_yaml_mapping,
     merge_defaults,
@@ -89,6 +91,71 @@ def test_merge_defaults_deep_merges_without_mutating_inputs() -> None:
         "advanced": {"blind_cols": ["sample_id", "speaker"], "auto_blind": False},
     }
     assert defaults["project"]["input_dir"] == "input"
+
+
+def test_build_config_source_metadata_from_config_source(tmp_path: Path) -> None:
+    source = ConfigSource(
+        kind="split_dir",
+        path=tmp_path / "config",
+        files={"project": tmp_path / "config" / "project.yaml"},
+        missing_sections=["advanced"],
+    )
+
+    metadata = build_config_source_metadata(
+        source,
+        missing_sections=["project", "advanced"],
+        defaults_applied=True,
+        default_path=tmp_path / "package" / "default_config.yaml",
+    )
+
+    assert metadata == {
+        "kind": "split_dir",
+        "path": str(tmp_path / "config"),
+        "files": {"project": str(tmp_path / "config" / "project.yaml")},
+        "missing_sections": ["project", "advanced"],
+        "defaults_applied": True,
+        "default_path": str(tmp_path / "package" / "default_config.yaml"),
+    }
+
+
+def test_build_config_source_metadata_for_packaged_defaults(tmp_path: Path) -> None:
+    metadata = build_config_source_metadata(
+        kind="packaged_default",
+        path=None,
+        files={},
+        missing_sections=["project", "advanced"],
+        defaults_applied=True,
+        default_path=tmp_path / "default_config.yaml",
+    )
+
+    assert metadata == {
+        "kind": "packaged_default",
+        "path": None,
+        "files": {},
+        "missing_sections": ["project", "advanced"],
+        "defaults_applied": True,
+        "default_path": str(tmp_path / "default_config.yaml"),
+    }
+
+
+def test_build_config_source_metadata_accepts_mapping_source(tmp_path: Path) -> None:
+    metadata = build_config_source_metadata(
+        {
+            "kind": "nested_file",
+            "path": tmp_path / "config.yaml",
+            "files": {"config": tmp_path / "config.yaml"},
+            "missing_sections": (),
+        },
+        extra={"note": "loaded"},
+    )
+
+    assert metadata == {
+        "kind": "nested_file",
+        "path": str(tmp_path / "config.yaml"),
+        "files": {"config": str(tmp_path / "config.yaml")},
+        "missing_sections": [],
+        "note": "loaded",
+    }
 
 
 def test_load_sectioned_config_from_nested_yaml_file(tmp_path: Path) -> None:
