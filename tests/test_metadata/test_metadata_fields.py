@@ -12,7 +12,10 @@ def test_default_metadata_field_matches_cha_filename_stem() -> None:
 
     assert manager.get_metadata_field_names() == ["file_name"]
     assert manager.match_metadata("sample_001.cha") == {"file_name": "sample_001"}
-    assert manager.match_metadata("sample_001.txt") == {"file_name": "file_name"}
+    assert manager.match_metadata("sample_001.txt") == {"file_name": ""}
+    assert manager.match_metadata("sample_001.txt", return_name=True) == {
+        "file_name": "file_name"
+    }
 
 
 def test_values_and_regex_metadata_fields_match_in_config_order() -> None:
@@ -35,8 +38,9 @@ def test_values_and_regex_metadata_fields_match_in_config_order() -> None:
 def test_metadata_match_can_return_none_for_missing_values() -> None:
     manager = MetadataManager({"tiers": {"site": ["AC"]}})
 
-    assert manager.match_metadata("study_BU.xlsx") == {"site": "site"}
+    assert manager.match_metadata("study_BU.xlsx") == {"site": ""}
     assert manager.match_metadata("study_BU.xlsx", return_none=True) == {"site": None}
+    assert manager.match_metadata("study_BU.xlsx", return_name=True) == {"site": "site"}
 
 
 def test_name_transform_is_applied_to_metadata_field_names() -> None:

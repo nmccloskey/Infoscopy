@@ -41,6 +41,7 @@ class MetadataField:
         text: str,
         *,
         return_none: bool = False,
+        return_name: bool = False,
         must_match: bool = False,
     ) -> Optional[str]:
         m = self.pattern.search(text)
@@ -50,13 +51,16 @@ class MetadataField:
         if must_match:
             logger.warning(f"No match for metadata field '{self.name}' in text: {text!r}")
 
-        return None if return_none else self.name
+        if return_none:
+            return None
+        return self.name if return_name else ""
 
     def match_path_parts(
         self,
         parts: List[str],
         *,
         return_none: bool = False,
+        return_name: bool = False,
         must_match: bool = False,
         source: str = "",
     ) -> Optional[str]:
@@ -92,7 +96,9 @@ class MetadataField:
                 f"No match for metadata field '{self.name}' in relative path: {location!r}"
             )
 
-        return None if return_none else self.name
+        if return_none:
+            return None
+        return self.name if return_name else ""
 
 
 # -------------------------
@@ -272,6 +278,7 @@ class MetadataManager:
         path: str | Path,
         *,
         return_none: bool = False,
+        return_name: bool = False,
         must_match: bool = False,
     ) -> Dict[str, Optional[str]]:
         parts = self._get_relative_parts(path)
@@ -280,6 +287,7 @@ class MetadataManager:
             field_name: self.metadata_fields[field_name].match_path_parts(
                 parts,
                 return_none=return_none,
+                return_name=return_name,
                 must_match=must_match,
                 source=source,
             )
@@ -315,11 +323,13 @@ class MetadataManager:
         text: str | Path,
         *,
         return_none: bool = False,
+        return_name: bool = False,
         must_match: bool = False,
     ) -> Dict[str, Optional[str]]:
         return self.match_metadata(
             text,
             return_none=return_none,
+            return_name=return_name,
             must_match=must_match,
         )
 
