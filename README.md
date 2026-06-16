@@ -3,14 +3,14 @@
 
 ![PyPI version](https://img.shields.io/pypi/v/psair)
 ![Python](https://img.shields.io/pypi/pyversions/psair)
-![License](https://img.shields.io/github/license/nmccloskey/PSAIR)
+![License](https://img.shields.io/pypi/l/psair)
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://psair-dev.streamlit.app/)
 
 **Status:** Alpha, active development  
 **Current supported components:** documentation/manual tooling, plus alpha metadata and NLP utilities  
 **Broader scope:** experimental infrastructure for ETL, EDA, NLP, and pipeline development
 
-PSAIR is a backend utility package for research software repositories. Its long-term goal is to provide reusable scaffolding for documentation workflows, data handling, exploratory analysis, and pipeline-oriented tooling across projects such as DIAAD, ALASTR, CLATR, and related systems.
+PSAIR is a backend utility package for research software repositories. Its long-term goal is to provide reusable scaffolding for documentation workflows, data handling, exploratory analysis, and pipeline-oriented tooling across projects such as DIAAD & ALASTR.
 
 At present, **the documentation toolchain is the most stable component and is ready for general use**. PSAIR also includes early, usable metadata and NLP utilities for filename metadata extraction, file discovery, text preprocessing, and shared spaCy model loading. Other package areas are included as part of the package's evolving architecture, but they should currently be treated as **experimental, incomplete, and subject to substantial change**.
 
@@ -30,6 +30,7 @@ Also available in alpha form:
 
 - metadata utilities for relative-path metadata field extraction and matching related files
 - NLP utilities for text preprocessing and shared spaCy model/resource loading
+- support for logging, provenance, and example I/O generation
 
 ## What is not ready yet
 
@@ -46,13 +47,13 @@ These components are being actively developed and reorganized. They are not yet 
 For the currently supported documentation tooling:
 
 ```bash
-pip install psair[docs]
+pip install "psair[docs]"
 ```
 
 If you are developing against the full experimental package layout:
 
 ```bash
-pip install psair[full]
+pip install "psair[full]"
 ```
 
 After installation, the documentation CLI is available as:
@@ -81,7 +82,7 @@ The CLI currently focuses on manual/documentation workflows:
 psair tree docs/manual
 psair index docs/manual --show-files
 psair search "topic" docs/manual
-psair outline docs/manual --title "Instruction Manual" --version "0.0.1"
+psair outline docs/manual --title "Instruction Manual" --version "0.0.3a1"
 psair chars docs/manual --check-trailing --check-line-endings
 psair pdf docs/manual --non-interactive --force
 ```

@@ -124,7 +124,7 @@ The CLI currently focuses on manual and documentation workflows:
 psair tree docs/manual
 psair index docs/manual --show-files
 psair search "topic" docs/manual
-psair outline docs/manual --title "Instruction Manual" --version "0.0.2a1"
+psair outline docs/manual --title "Instruction Manual" --version "0.0.3a1"
 psair chars docs/manual --check-trailing --check-line-endings
 psair pdf docs/manual --non-interactive --force
 ```
@@ -149,7 +149,7 @@ For example:
 
 ```bash
 psair chars docs/manual --check-trailing --check-line-endings
-psair outline docs/manual --title "PSAIR Instruction Manual" --version "0.0.2a1"
+psair outline docs/manual --title "PSAIR Instruction Manual" --version "0.0.3a1"
 psair pdf docs/manual --yaml docs/manual/manual_pdf.yaml --non-interactive --force
 ```
 

@@ -5,13 +5,18 @@ from pathlib import Path
 
 from psair.core.logger import logger
 from psair.nlp import NLPModel
-from psair.etl.OutputManager import OutputManager
 from psair.nlp.data_processing import (
     scrub_raw_text,
     clean_text,
     get_text_from_cha,
     get_two_cha_versions
 )
+
+
+def _get_output_manager():
+    from psair.etl.OutputManager import OutputManager
+
+    return OutputManager()
 
 
 def process_sents(doc, sample_data, is_cha=False):
@@ -122,7 +127,7 @@ def process_sample_data(PM, sample_data):
         return {}
 
 def read_chat_file(file_path: str) -> dict:
-    OM = OutputManager()
+    OM = _get_output_manager()
     exclude_speakers = OM.config.get("exclude_speakers", ["INV"])
     text_content = get_text_from_cha(file_path, exclude_speakers)
     logger.info(f"Processed CHAT file: {file_path}")
@@ -225,7 +230,7 @@ def preprocess_text(PM) -> list:
         FileNotFoundError: If `input_dir` does not exist.
         ValueError: If file format is unsupported.
     """
-    OM = OutputManager()
+    OM = _get_output_manager()
 
     input_dir = Path(OM.input_dir)
     if not input_dir.is_dir():

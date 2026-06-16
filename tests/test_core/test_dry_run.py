@@ -39,7 +39,7 @@ def _payload() -> dict:
         environment={
             "python_version": "3.12.x",
             "platform": "test",
-            "package_versions": {"diaad": "0.3.0", "psair": "0.0.2a3"},
+            "package_versions": {"diaad": "0.3.0", "psair": "0.0.3a1"},
         },
         warnings=["example warning"],
     )

@@ -176,7 +176,7 @@ def test_read_chat_file_uses_output_manager_exclusions(
         captured["exclude_speakers"] = exclude_speakers
         return "child text"
 
-    monkeypatch.setattr(preprocessing_module, "OutputManager", FakeOutputManager)
+    monkeypatch.setattr(preprocessing_module, "_get_output_manager", FakeOutputManager)
     monkeypatch.setattr(preprocessing_module, "get_text_from_cha", fake_get_text_from_cha)
 
     assert preprocessing_module.read_chat_file("sample.cha") == "child text"
