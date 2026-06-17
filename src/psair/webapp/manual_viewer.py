@@ -32,6 +32,7 @@ from .manual_export import (
 OutlineMode = Literal["never", "if_missing", "always"]
 ManualSourceInput = Union[ManualSource, Mapping[str, object], str, Path]
 ManualSourceCacheSpec = tuple[str, str, str, str]
+PathModuleAliasSpec = tuple[tuple[str, str], ...]
 _SECTION_LABEL_RE = re.compile(r"^(?P<num>\d+(?:[_-]\d+)*)(?:[_-].*)?$")
 
 
@@ -46,12 +47,14 @@ def build_composed_manual_index_cached(
     infer_from_paths: bool,
     unmatched_policy: UnmatchedPolicy,
     on_duplicate: DuplicatePolicy,
+    path_module_aliases: PathModuleAliasSpec,
 ) -> tuple[TreeNode, Dict[str, ManualFile], tuple[str, ...]]:
     return _build_composed_manual_index_from_specs(
         source_specs,
         infer_from_paths=infer_from_paths,
         unmatched_policy=unmatched_policy,
         on_duplicate=on_duplicate,
+        path_module_aliases=path_module_aliases,
     )
 
 
@@ -303,6 +306,7 @@ def _build_composed_manual_index_from_specs(
     infer_from_paths: bool,
     unmatched_policy: UnmatchedPolicy,
     on_duplicate: DuplicatePolicy,
+    path_module_aliases: PathModuleAliasSpec = (),
 ) -> tuple[TreeNode, Dict[str, ManualFile], tuple[str, ...]]:
     sources = [
         ManualSource(
@@ -316,10 +320,25 @@ def _build_composed_manual_index_from_specs(
     composed = build_composed_manual(
         sources,
         infer_from_paths=infer_from_paths,
+        path_module_aliases=dict(path_module_aliases),
         unmatched_policy=unmatched_policy,
         on_duplicate=on_duplicate,
     )
     return composed.tree, composed.flat, composed.diagnostics
+
+
+def _normalize_path_module_aliases_for_cache(
+    aliases: Mapping[str, str] | None,
+) -> PathModuleAliasSpec:
+    if aliases is None:
+        return ()
+    return tuple(
+        sorted(
+            (str(key).strip(), str(value).strip())
+            for key, value in aliases.items()
+            if str(key).strip() and str(value).strip()
+        )
+    )
 
 
 def _render_manual_controls(
@@ -639,6 +658,7 @@ def render_manual_ui(
     enable_pdf_export: bool = False,
     enable_docx_export: bool = True,
     compose_infer_from_paths: bool = False,
+    compose_path_module_aliases: Mapping[str, str] | None = None,
     compose_unmatched_policy: UnmatchedPolicy = "source_path",
     compose_on_duplicate: DuplicatePolicy = "error",
 ) -> None:
@@ -650,7 +670,8 @@ def render_manual_ui(
     compose authored and generated manual roots into one tree. pdf_yaml_rel_path
     may point to a Pandoc metadata YAML file relative to repo_root or the
     primary manual root. PDF export is opt-in so downstream web apps can stay
-    lightweight.
+    lightweight. compose_path_module_aliases lets transitional path inference
+    map authored folder names to generated module IDs.
     """
     ns = _manual_ui_namespace(manual_rel_dir, ui_key=ui_key)
     state_keys = _manual_state_keys(ns)
@@ -688,6 +709,7 @@ def render_manual_ui(
             compose_infer_from_paths,
             compose_unmatched_policy,
             compose_on_duplicate,
+            _normalize_path_module_aliases_for_cache(compose_path_module_aliases),
         )
 
     if not flat:

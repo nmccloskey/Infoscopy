@@ -87,6 +87,7 @@ def build_composed_manual_markdown(
     include_outline: bool = False,
     outline_name: str = "00_outline.md",
     infer_from_paths: bool = False,
+    path_module_aliases: Mapping[str, str] | None = None,
     unmatched_policy: UnmatchedPolicy = "source_path",
     on_duplicate: DuplicatePolicy = "error",
 ) -> tuple[str, list[dict[str, str]]]:
@@ -97,6 +98,7 @@ def build_composed_manual_markdown(
         include_outline=include_outline,
         outline_name=outline_name,
         infer_from_paths=infer_from_paths,
+        path_module_aliases=path_module_aliases,
         unmatched_policy=unmatched_policy,
         on_duplicate=on_duplicate,
     )

@@ -27,16 +27,22 @@ def write(path: Path, text: str) -> Path:
     return path
 
 
-def command_front_matter() -> str:
-    return """---
+def command_front_matter(
+    *,
+    object_id: str = "transcripts.tabularize",
+    canonical_command: str = "transcripts tabularize",
+    module_id: str = "transcripts",
+    title: str = "Transcript Tabularization Example",
+) -> str:
+    return f"""---
 object_type: command
 object_types:
   - command
-object_id: transcripts.tabularize
-command_id: transcripts.tabularize
-canonical_command: transcripts tabularize
-module_id: transcripts
-title: Transcript Tabularization Example
+object_id: {object_id}
+command_id: {object_id}
+canonical_command: {canonical_command}
+module_id: {module_id}
+title: {title}
 view: example_io
 view_label: Example I/O
 view_order: 50
@@ -284,6 +290,53 @@ def test_build_composed_manual_index_from_specs_adds_virtual_example_io(
     assert flat[rel].abs_path == generated_doc.resolve()
     assert flat[rel].text.startswith("# Transcript Tabularization Example")
     assert "04_modules" in tree
+    assert diagnostics == ()
+
+
+def test_build_composed_manual_index_from_specs_applies_path_aliases(
+    tmp_path: Path,
+) -> None:
+    authored = tmp_path / "manual"
+    generated = tmp_path / "example_io"
+    write(
+        authored
+        / "04_modules"
+        / "03_complete_utterances"
+        / "05_commands"
+        / "01_files"
+        / "01_quickstart.md",
+        "# `cus files` Quickstart\nRun it.\n",
+    )
+    generated_doc = write(
+        generated / "cus" / "files.md",
+        command_front_matter(object_id="cus.files")
+        + "# CU Files Example\nGenerated preview.\n",
+    )
+    source_specs = (
+        (str(authored.resolve()), "authored", "authored", "authored"),
+        (
+            str(generated.resolve()),
+            "example_io",
+            "generated_example_io",
+            "generated",
+        ),
+    )
+
+    _tree, flat, diagnostics = viewer._build_composed_manual_index_from_specs(
+        source_specs,
+        infer_from_paths=True,
+        unmatched_policy="generated_root",
+        on_duplicate="error",
+        path_module_aliases=(("complete_utterances", "cus"),),
+    )
+
+    rel = (
+        "04_modules/03_complete_utterances/05_commands/"
+        "01_files/05_example_io.md"
+    )
+    assert rel in flat
+    assert flat[rel].abs_path == generated_doc.resolve()
+    assert not any(path.startswith("generated/") for path in flat)
     assert diagnostics == ()
 
 

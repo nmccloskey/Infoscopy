@@ -118,6 +118,7 @@ def discover_manual_views(
     include_outline: bool = False,
     outline_name: str = "00_outline.md",
     infer_from_paths: bool = False,
+    path_module_aliases: Mapping[str, str] | None = None,
 ) -> list[ManualView]:
     """Discover Markdown views from one or more source roots."""
     normalized_sources = [_normalize_source(source) for source in sources]
@@ -138,7 +139,10 @@ def discover_manual_views(
             raw_text = read_text_safely(path)
             front_matter, body = split_front_matter(raw_text)
             inferred = (
-                _infer_diaad_command_metadata(rel_path)
+                _infer_diaad_command_metadata(
+                    rel_path,
+                    module_aliases=path_module_aliases,
+                )
                 if infer_from_paths
                 else {}
             )
@@ -228,6 +232,7 @@ def build_composed_manual(
     include_outline: bool = False,
     outline_name: str = "00_outline.md",
     infer_from_paths: bool = False,
+    path_module_aliases: Mapping[str, str] | None = None,
     unmatched_policy: UnmatchedPolicy = "source_path",
     on_duplicate: DuplicatePolicy = "error",
 ) -> ComposedManual:
@@ -238,6 +243,7 @@ def build_composed_manual(
         include_outline=include_outline,
         outline_name=outline_name,
         infer_from_paths=infer_from_paths,
+        path_module_aliases=path_module_aliases,
     )
     return compose_manual_views(
         views,
@@ -458,7 +464,11 @@ def _build_tree_and_flat(
     return tree, flat
 
 
-def _infer_diaad_command_metadata(rel_path: Path) -> dict[str, object]:
+def _infer_diaad_command_metadata(
+    rel_path: Path,
+    *,
+    module_aliases: Mapping[str, str] | None = None,
+) -> dict[str, object]:
     parts = list(rel_path.parts)
     if len(parts) < 5:
         return {}
@@ -473,6 +483,7 @@ def _infer_diaad_command_metadata(rel_path: Path) -> dict[str, object]:
         return {}
 
     module_id = _strip_numeric_prefix(parts[commands_index - 1])
+    module_id = _normalize_module_aliases(module_aliases).get(module_id, module_id)
     action_id = _strip_numeric_prefix(parts[commands_index + 1])
     view = _view_from_path(rel_path)
     if not module_id or not action_id or not view:
@@ -491,6 +502,20 @@ def _infer_diaad_command_metadata(rel_path: Path) -> dict[str, object]:
         "source_manual": "authored",
         "generated": False,
     }
+
+
+def _normalize_module_aliases(
+    aliases: Mapping[str, str] | None,
+) -> dict[str, str]:
+    if aliases is None:
+        return {}
+    normalized: dict[str, str] = {}
+    for key, value in aliases.items():
+        key_norm = _strip_numeric_prefix(str(key))
+        value_norm = str(value).strip().lower()
+        if key_norm and value_norm:
+            normalized[key_norm] = value_norm
+    return normalized
 
 
 def _view_from_path(rel_path: Path) -> str:

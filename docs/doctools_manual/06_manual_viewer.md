@@ -121,6 +121,7 @@ Renders a complete interactive manual viewer within a Streamlit application.
 | `outline_max_depth` | Maximum depth for generated outline trees |
 | `manual_sources` | Optional multi-root source list for composed manuals |
 | `compose_infer_from_paths` | Enables transitional path inference for authored command views |
+| `compose_path_module_aliases` | Optional folder-name to module-ID aliases used by path inference |
 | `compose_unmatched_policy` | Controls placement of generated views without authored anchors |
 
 ### Outline Modes

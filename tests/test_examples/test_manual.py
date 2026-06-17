@@ -299,6 +299,46 @@ def test_view_order_controls_virtual_generated_sibling_order(
     assert composed.flat[command_paths[-1]].title == "Appendix"
 
 
+def test_path_module_aliases_anchor_generated_command_views(
+    tmp_path: Path,
+) -> None:
+    authored = tmp_path / "manual"
+    generated = tmp_path / "example_io"
+    write(
+        authored
+        / "04_modules"
+        / "03_complete_utterances"
+        / "05_commands"
+        / "01_files"
+        / "01_quickstart.md",
+        "# `cus files` Quickstart\nRun it.\n",
+    )
+    generated_doc = write(
+        generated / "cus" / "files.md",
+        command_front_matter(object_id="cus.files")
+        + "# CU Files Example\nGenerated preview.\n",
+    )
+
+    composed = build_composed_manual(
+        [
+            ManualSource(authored, name="authored", role="authored"),
+            ManualSource(generated, name="example_io", role="generated"),
+        ],
+        infer_from_paths=True,
+        path_module_aliases={"complete_utterances": "cus"},
+        unmatched_policy="generated_root",
+    )
+
+    rel = (
+        "04_modules/03_complete_utterances/05_commands/"
+        "01_files/05_example_io.md"
+    )
+    assert rel in composed.flat
+    assert composed.flat[rel].abs_path == generated_doc.resolve()
+    assert not any(path.startswith("generated/") for path in composed.flat)
+    assert composed.diagnostics == ()
+
+
 def test_duplicate_object_view_pairs_raise_deterministic_error(
     tmp_path: Path,
 ) -> None:
