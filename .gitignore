@@ -79,3 +79,11 @@ Thumbs.db
 .tox/
 .coverage
 htmlcov/
+
+# more IDE/editor stuff
+.devcontainer/
+.devcontainer.json
+.codex-local/
+
+# Example files
+example_files/
