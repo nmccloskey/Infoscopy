@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 import re
 from typing import Dict, Literal, Optional, Union
 
 import streamlit as st
 
+from ..examples.manual import (
+    DuplicatePolicy,
+    ManualSource,
+    UnmatchedPolicy,
+    build_composed_manual,
+)
 from ..manual.index import (
     ManualFile,
     TreeNode,
@@ -23,12 +30,29 @@ from .manual_export import (
 )
 
 OutlineMode = Literal["never", "if_missing", "always"]
+ManualSourceInput = Union[ManualSource, Mapping[str, object], str, Path]
+ManualSourceCacheSpec = tuple[str, str, str, str]
 _SECTION_LABEL_RE = re.compile(r"^(?P<num>\d+(?:[_-]\d+)*)(?:[_-].*)?$")
 
 
 @st.cache_data(show_spinner=False)
 def build_manual_index_cached(manual_dir: str) -> tuple[TreeNode, Dict[str, ManualFile]]:
     return build_manual_index(manual_dir)
+
+
+@st.cache_data(show_spinner=False)
+def build_composed_manual_index_cached(
+    source_specs: tuple[ManualSourceCacheSpec, ...],
+    infer_from_paths: bool,
+    unmatched_policy: UnmatchedPolicy,
+    on_duplicate: DuplicatePolicy,
+) -> tuple[TreeNode, Dict[str, ManualFile], tuple[str, ...]]:
+    return _build_composed_manual_index_from_specs(
+        source_specs,
+        infer_from_paths=infer_from_paths,
+        unmatched_policy=unmatched_policy,
+        on_duplicate=on_duplicate,
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -155,6 +179,147 @@ def _prepare_manual_root(
             st.warning(f"Could not prepare manual outline: {exc}")
 
     return manual_root
+
+
+def _normalize_manual_source_specs(
+    *,
+    repo_root: Union[str, Path],
+    manual_sources: Sequence[ManualSourceInput],
+) -> tuple[ManualSourceCacheSpec, ...]:
+    """
+    Convert public manual-source inputs to cache-safe absolute source specs.
+    """
+    repo_root = Path(repo_root).resolve()
+    specs: list[ManualSourceCacheSpec] = []
+
+    for source in manual_sources:
+        root, name, source_manual, role = _manual_source_parts(source)
+        root_path = Path(root)
+        if not root_path.is_absolute():
+            root_path = repo_root / root_path
+        root_path = root_path.resolve()
+        resolved_name = name or root_path.name or "manual"
+        specs.append(
+            (
+                str(root_path),
+                resolved_name,
+                source_manual or "authored",
+                role or "authored",
+            )
+        )
+
+    return tuple(specs)
+
+
+def _manual_source_parts(
+    source: ManualSourceInput,
+) -> tuple[Union[str, Path], str, str, str]:
+    if isinstance(source, ManualSource):
+        return source.root, source.name, source.source_manual, source.role
+
+    if isinstance(source, Mapping):
+        if "root" not in source:
+            raise ValueError("Manual source mappings must include a 'root' value.")
+        root = source["root"]
+        if not isinstance(root, (str, Path)):
+            raise TypeError("Manual source 'root' must be a path string or Path.")
+
+        root_path = Path(root)
+        name = _mapping_str(source, "name") or root_path.name or "manual"
+        source_manual = _mapping_str(source, "source_manual") or "authored"
+        role = _mapping_str(source, "role") or "authored"
+        return root, name, source_manual, role
+
+    path = Path(source)
+    return path, path.name or "manual", "authored", "authored"
+
+
+def _mapping_str(mapping: Mapping[str, object], key: str) -> str | None:
+    value = mapping.get(key)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _prepare_manual_sources(
+    *,
+    repo_root: Union[str, Path],
+    manual_sources: Sequence[ManualSourceInput],
+    ensure_outline: OutlineMode,
+    outline_title: str,
+    outline_version: str,
+    outline_max_depth: int | None,
+) -> tuple[ManualSourceCacheSpec, ...] | None:
+    """
+    Resolve composed manual sources and ensure outlines for authored roots.
+    """
+    ensure_outline = _validate_outline_mode(ensure_outline)
+    specs = _normalize_manual_source_specs(
+        repo_root=repo_root,
+        manual_sources=manual_sources,
+    )
+    prepared: list[ManualSourceCacheSpec] = []
+
+    for root_str, name, source_manual, role in specs:
+        root = Path(root_str)
+        if not root.exists():
+            st.warning(f"Manual source directory not found: {root}")
+            continue
+
+        if ensure_outline != "never" and not _manual_source_is_generated(
+            source_manual=source_manual,
+            role=role,
+        ):
+            try:
+                ensure_manual_outline(
+                    root,
+                    manual_title=outline_title,
+                    manual_version=outline_version,
+                    max_depth=outline_max_depth,
+                    if_missing_only=(ensure_outline == "if_missing"),
+                )
+            except Exception as exc:
+                st.warning(f"Could not prepare manual outline for {root}: {exc}")
+
+        prepared.append((root_str, name, source_manual, role))
+
+    if not prepared:
+        st.warning("No manual source directories found.")
+        return None
+
+    return tuple(prepared)
+
+
+def _manual_source_is_generated(*, source_manual: str, role: str) -> bool:
+    return (
+        role.strip().lower() == "generated"
+        or source_manual.strip().lower().startswith("generated")
+    )
+
+
+def _build_composed_manual_index_from_specs(
+    source_specs: tuple[ManualSourceCacheSpec, ...],
+    *,
+    infer_from_paths: bool,
+    unmatched_policy: UnmatchedPolicy,
+    on_duplicate: DuplicatePolicy,
+) -> tuple[TreeNode, Dict[str, ManualFile], tuple[str, ...]]:
+    sources = [
+        ManualSource(
+            root=Path(root),
+            name=name,
+            source_manual=source_manual,
+            role=role,
+        )
+        for root, name, source_manual, role in source_specs
+    ]
+    composed = build_composed_manual(
+        sources,
+        infer_from_paths=infer_from_paths,
+        unmatched_policy=unmatched_policy,
+        on_duplicate=on_duplicate,
+    )
+    return composed.tree, composed.flat, composed.diagnostics
 
 
 def _render_manual_controls(
@@ -463,6 +628,7 @@ def render_manual_ui(
     *,
     repo_root: Union[str, Path],
     manual_rel_dir: Union[str, Path] = "manual",
+    manual_sources: Sequence[ManualSourceInput] | None = None,
     expander_label: str = "Show / Hide Instruction Manual",
     ensure_outline: OutlineMode = "if_missing",
     outline_title: str = "Instruction Manual",
@@ -472,31 +638,58 @@ def render_manual_ui(
     pdf_yaml_rel_path: Union[str, Path, None] = None,
     enable_pdf_export: bool = False,
     enable_docx_export: bool = True,
+    compose_infer_from_paths: bool = False,
+    compose_unmatched_policy: UnmatchedPolicy = "source_path",
+    compose_on_duplicate: DuplicatePolicy = "error",
 ) -> None:
     """
     Render a namespaced Streamlit manual viewer.
 
     This version supports multiple manual viewers on the same page by
-    namespacing widget keys and session-state fields. pdf_yaml_rel_path may
-    point to a Pandoc metadata YAML file relative to repo_root or manual_root.
-    PDF export is opt-in so downstream web apps can stay lightweight.
+    namespacing widget keys and session-state fields. Set manual_sources to
+    compose authored and generated manual roots into one tree. pdf_yaml_rel_path
+    may point to a Pandoc metadata YAML file relative to repo_root or the
+    primary manual root. PDF export is opt-in so downstream web apps can stay
+    lightweight.
     """
     ns = _manual_ui_namespace(manual_rel_dir, ui_key=ui_key)
     state_keys = _manual_state_keys(ns)
     _init_manual_state(state_keys)
 
-    manual_root = _prepare_manual_root(
-        repo_root=repo_root,
-        manual_rel_dir=manual_rel_dir,
-        ensure_outline=ensure_outline,
-        outline_title=outline_title,
-        outline_version=outline_version,
-        outline_max_depth=outline_max_depth,
-    )
-    if manual_root is None:
-        return
+    if manual_sources is None:
+        manual_root = _prepare_manual_root(
+            repo_root=repo_root,
+            manual_rel_dir=manual_rel_dir,
+            ensure_outline=ensure_outline,
+            outline_title=outline_title,
+            outline_version=outline_version,
+            outline_max_depth=outline_max_depth,
+        )
+        if manual_root is None:
+            return
 
-    tree, flat = build_manual_index_cached(str(manual_root))
+        tree, flat = build_manual_index_cached(str(manual_root))
+        diagnostics: tuple[str, ...] = ()
+    else:
+        source_specs = _prepare_manual_sources(
+            repo_root=repo_root,
+            manual_sources=manual_sources,
+            ensure_outline=ensure_outline,
+            outline_title=outline_title,
+            outline_version=outline_version,
+            outline_max_depth=outline_max_depth,
+        )
+        if source_specs is None:
+            return
+
+        manual_root = Path(source_specs[0][0])
+        tree, flat, diagnostics = build_composed_manual_index_cached(
+            source_specs,
+            compose_infer_from_paths,
+            compose_unmatched_policy,
+            compose_on_duplicate,
+        )
+
     if not flat:
         st.warning(f"No markdown files found under: {manual_root}")
         return
@@ -516,6 +709,11 @@ def render_manual_ui(
 
         with st.expander("Manual Map (Tree)", expanded=False):
             st.code(render_generated_tree_text(tree, show_titles=True), language="text")
+
+        if diagnostics:
+            with st.expander("Manual Composition Notes", expanded=False):
+                for diagnostic in diagnostics:
+                    st.caption(diagnostic)
 
         _render_manual_search(ns=ns, flat=flat, state_keys=state_keys)
         _render_manual_sections(ns=ns, tree=tree, flat=flat, state_keys=state_keys)

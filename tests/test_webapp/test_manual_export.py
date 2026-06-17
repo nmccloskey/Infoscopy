@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from psair.examples import ManualSource
 from psair.manual.index import ManualFile
 from psair.webapp import manual_export as export
 
@@ -15,6 +16,32 @@ def manual_file(rel_path: str, title: str, text: str) -> ManualFile:
         title=title,
         text=text,
     )
+
+
+def write(path: Path, text: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return path
+
+
+def command_front_matter() -> str:
+    return """---
+object_type: command
+object_types:
+  - command
+object_id: transcripts.tabularize
+command_id: transcripts.tabularize
+canonical_command: transcripts tabularize
+module_id: transcripts
+title: Transcript Tabularization Example
+view: example_io
+view_label: Example I/O
+view_order: 50
+source_manual: generated_example_io
+generated: true
+---
+
+"""
 
 
 def test_detect_manual_export_backends_reports_runtime_availability(
@@ -103,6 +130,51 @@ def test_build_manual_markdown_from_index_can_leave_headings_and_pagebreaks_off(
     )
 
     assert markdown_text == "# 01 Intro\nAlpha\n\n# 02 Topic\nBeta\n"
+
+
+def test_build_composed_manual_markdown_exports_virtual_example_order(
+    tmp_path: Path,
+) -> None:
+    authored = tmp_path / "manual"
+    generated = tmp_path / "example_io"
+    command_dir = (
+        authored
+        / "04_modules"
+        / "01_transcripts"
+        / "05_commands"
+        / "01_tabularize"
+    )
+    write(command_dir / "01_quickstart.md", "# Quickstart\nRun it.\n")
+    write(command_dir / "02_usage_guide.md", "# Usage Guide\nUse it.\n")
+    write(command_dir / "04_implementation_notes.md", "# Implementation Notes\nInternals.\n")
+    write(
+        generated / "transcripts" / "tabularize.md",
+        command_front_matter()
+        + "# Transcript Tabularization Example\nGenerated preview.\n",
+    )
+
+    markdown_text, metadata = export.build_composed_manual_markdown(
+        [
+            ManualSource(authored, name="authored", role="authored"),
+            ManualSource(generated, name="example_io", role="generated"),
+        ],
+        infer_from_paths=True,
+        pagebreaks=False,
+    )
+
+    assert "---" not in markdown_text
+    assert markdown_text.index("# Quickstart") < markdown_text.index("# Usage Guide")
+    assert markdown_text.index("# Usage Guide") < markdown_text.index("# Implementation Notes")
+    assert markdown_text.index("# Implementation Notes") < markdown_text.index(
+        "# Transcript Tabularization Example"
+    )
+    assert [item["rel_path"] for item in metadata] == [
+        "04_modules/01_transcripts/05_commands/01_tabularize/01_quickstart.md",
+        "04_modules/01_transcripts/05_commands/01_tabularize/02_usage_guide.md",
+        "04_modules/01_transcripts/05_commands/01_tabularize/04_implementation_notes.md",
+        "04_modules/01_transcripts/05_commands/01_tabularize/05_example_io.md",
+    ]
+    assert metadata[-1]["title"] == "Example I/O"
 
 
 def test_pandoc_export_args_include_title_only_when_present() -> None:

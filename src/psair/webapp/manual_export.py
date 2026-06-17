@@ -8,8 +8,14 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Mapping
+from typing import Mapping, Sequence
 
+from ..examples.manual import (
+    DuplicatePolicy,
+    ManualSource,
+    UnmatchedPolicy,
+    build_composed_manual,
+)
 from ..manual.index import ManualFile, build_manual_index, numeric_sort_key
 from ..manual.pdf import (
     add_pagebreaks_between_sections,
@@ -67,6 +73,35 @@ def build_manual_markdown(
     _tree, flat = build_manual_index(manual_root)
     return build_manual_markdown_from_index(
         flat,
+        strip_heading_numbers=strip_heading_numbers,
+        pagebreaks=pagebreaks,
+    )
+
+
+def build_composed_manual_markdown(
+    sources: Sequence[ManualSource | str | Path],
+    *,
+    strip_heading_numbers: bool = True,
+    pagebreaks: bool = True,
+    include_exts: set[str] | None = None,
+    include_outline: bool = False,
+    outline_name: str = "00_outline.md",
+    infer_from_paths: bool = False,
+    unmatched_policy: UnmatchedPolicy = "source_path",
+    on_duplicate: DuplicatePolicy = "error",
+) -> tuple[str, list[dict[str, str]]]:
+    """Build export-ready Markdown from a composed multi-source manual."""
+    composed = build_composed_manual(
+        sources,
+        include_exts=include_exts,
+        include_outline=include_outline,
+        outline_name=outline_name,
+        infer_from_paths=infer_from_paths,
+        unmatched_policy=unmatched_policy,
+        on_duplicate=on_duplicate,
+    )
+    return build_manual_markdown_from_index(
+        composed.flat,
         strip_heading_numbers=strip_heading_numbers,
         pagebreaks=pagebreaks,
     )

@@ -7,6 +7,7 @@ import pytest
 
 pytest.importorskip("streamlit")
 
+from psair.examples import ManualSource
 from psair.manual.index import ManualFile
 from psair.webapp import manual_viewer as viewer
 
@@ -18,6 +19,32 @@ def manual_file(rel_path: str, title: str, text: str = "# Title\nBody") -> Manua
         title=title,
         text=text,
     )
+
+
+def write(path: Path, text: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return path
+
+
+def command_front_matter() -> str:
+    return """---
+object_type: command
+object_types:
+  - command
+object_id: transcripts.tabularize
+command_id: transcripts.tabularize
+canonical_command: transcripts tabularize
+module_id: transcripts
+title: Transcript Tabularization Example
+view: example_io
+view_label: Example I/O
+view_order: 50
+source_manual: generated_example_io
+generated: true
+---
+
+"""
 
 
 def test_validate_outline_mode_accepts_known_modes_and_rejects_unknown() -> None:
@@ -47,6 +74,46 @@ def test_manual_ui_namespace_and_state_keys_are_stable() -> None:
         "expand_all": "docs_expand_all",
         "search": "docs_search",
     }
+
+
+def test_normalize_manual_source_specs_handles_supported_inputs(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    generated = tmp_path / "pkg" / "example_io"
+
+    specs = viewer._normalize_manual_source_specs(
+        repo_root=repo_root,
+        manual_sources=[
+            "docs/manual",
+            {
+                "root": generated,
+                "name": "example_io",
+                "source_manual": "generated_example_io",
+                "role": "generated",
+            },
+            ManualSource("extra/manual", name="extra"),
+        ],
+    )
+
+    assert specs == (
+        (
+            str((repo_root / "docs/manual").resolve()),
+            "manual",
+            "authored",
+            "authored",
+        ),
+        (
+            str(generated.resolve()),
+            "example_io",
+            "generated_example_io",
+            "generated",
+        ),
+        (
+            str((repo_root / "extra/manual").resolve()),
+            "extra",
+            "authored",
+            "authored",
+        ),
+    )
 
 
 def test_init_manual_state_preserves_existing_values(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,6 +189,50 @@ def test_prepare_manual_root_can_ensure_outline(
             },
         }
     ]
+
+
+def test_build_composed_manual_index_from_specs_adds_virtual_example_io(
+    tmp_path: Path,
+) -> None:
+    authored = tmp_path / "manual"
+    generated = tmp_path / "example_io"
+    write(
+        authored
+        / "04_modules"
+        / "01_transcripts"
+        / "05_commands"
+        / "01_tabularize"
+        / "01_quickstart.md",
+        "# `transcripts tabularize` Quickstart\nRun it.\n",
+    )
+    generated_doc = write(
+        generated / "transcripts" / "tabularize.md",
+        command_front_matter()
+        + "# Transcript Tabularization Example\nGenerated preview.\n",
+    )
+    source_specs = (
+        (str(authored.resolve()), "authored", "authored", "authored"),
+        (
+            str(generated.resolve()),
+            "example_io",
+            "generated_example_io",
+            "generated",
+        ),
+    )
+
+    tree, flat, diagnostics = viewer._build_composed_manual_index_from_specs(
+        source_specs,
+        infer_from_paths=True,
+        unmatched_policy="source_path",
+        on_duplicate="error",
+    )
+
+    rel = "04_modules/01_transcripts/05_commands/01_tabularize/05_example_io.md"
+    assert rel in flat
+    assert flat[rel].abs_path == generated_doc.resolve()
+    assert flat[rel].text.startswith("# Transcript Tabularization Example")
+    assert "04_modules" in tree
+    assert diagnostics == ()
 
 
 def test_resolve_pdf_yaml_path_prefers_explicit_repo_then_manual_path(tmp_path: Path) -> None:

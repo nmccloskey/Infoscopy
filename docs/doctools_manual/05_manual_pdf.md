@@ -247,6 +247,38 @@ Returns a `Path` representing the compiled PDF location.
 
 ---
 
+## Composed Manual Exports
+
+For webapp downloads and multi-source manuals, PSAIR can compose manual roots
+first and then export the resulting virtual tree. The helper
+`build_composed_manual_markdown()` in `psair.webapp.manual_export` accepts the
+same source concept used by the Streamlit viewer:
+
+```python
+from psair.examples import ManualSource
+from psair.webapp.manual_export import build_composed_manual_markdown
+
+markdown_text, section_meta = build_composed_manual_markdown(
+    [
+        ManualSource("docs/manual", name="manual", role="authored"),
+        ManualSource(
+            "src/project/examples/assets/rendered_docs/example_io",
+            name="example_io",
+            source_manual="generated_example_io",
+            role="generated",
+        ),
+    ],
+    infer_from_paths=True,
+)
+```
+
+The returned Markdown uses the same virtual ordering as the composed viewer.
+For example, generated `example_io` command views can export after authored
+`01_quickstart.md`, `02_usage_guide.md`, and `04_implementation_notes.md` as a
+virtual `05_example_io.md` section. YAML front matter is stripped before export.
+
+---
+
 ## Supporting Utilities
 
 ## iter_markdown_files

@@ -14,6 +14,8 @@ The viewer allows users to:
 - expand and collapse manual directories
 - display documentation inline within the application
 - download the displayed manual as PDF or DOCX when optional export backends are available
+- compose authored manual roots with generated Example I/O roots into one
+  navigable tree
 
 This functionality makes it possible to integrate **fully navigable instruction manuals directly into Streamlit-based tools**.
 
@@ -50,6 +52,46 @@ and cached within the viewer for performance.
 
 ---
 
+# Composed Manual Sources
+
+`render_manual_ui()` can still read a single physical manual root through
+`manual_rel_dir`. It can also compose multiple source roots through the
+`manual_sources` argument.
+
+Each source can be a path, a `ManualSource`, or a mapping with:
+
+| Field | Purpose |
+|----------|-------------|
+| `root` | Source directory, absolute or relative to `repo_root` |
+| `name` | Stable source name used in diagnostics and unmatched generated paths |
+| `source_manual` | Source label such as `authored` or `generated_example_io` |
+| `role` | Source role such as `authored` or `generated` |
+
+Example:
+
+```python
+render_manual_ui(
+    repo_root=repo_root,
+    manual_sources=[
+        {"root": "docs/manual", "name": "manual", "role": "authored"},
+        {
+            "root": package_root / "examples/assets/rendered_docs/example_io",
+            "name": "example_io",
+            "source_manual": "generated_example_io",
+            "role": "generated",
+        },
+    ],
+    compose_infer_from_paths=True,
+)
+```
+
+Generated views are matched to authored views by manual metadata such as
+`object_type`, `object_id`, and `view`. When an authored command folder can be
+identified, generated `example_io` content appears as a virtual sibling such as
+`05_example_io.md` without being copied into the authored manual tree.
+
+---
+
 # Core Functions
 
 ## render_manual_ui
@@ -75,6 +117,9 @@ Renders a complete interactive manual viewer within a Streamlit application.
 | `outline_title` | Title used if an outline is generated |
 | `outline_version` | Version string used if outline is generated |
 | `outline_max_depth` | Maximum depth for generated outline trees |
+| `manual_sources` | Optional multi-root source list for composed manuals |
+| `compose_infer_from_paths` | Enables transitional path inference for authored command views |
+| `compose_unmatched_policy` | Controls placement of generated views without authored anchors |
 
 ### Outline Modes
 
