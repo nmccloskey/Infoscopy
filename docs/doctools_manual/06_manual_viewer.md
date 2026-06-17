@@ -89,6 +89,8 @@ Generated views are matched to authored views by manual metadata such as
 `object_type`, `object_id`, and `view`. When an authored command folder can be
 identified, generated `example_io` content appears as a virtual sibling such as
 `05_example_io.md` without being copied into the authored manual tree.
+See Manual Composition (`docs/doctools_manual/09_manual_composition.md`) for
+the full source, front matter, ordering, export, and limitation contract.
 
 ---
 

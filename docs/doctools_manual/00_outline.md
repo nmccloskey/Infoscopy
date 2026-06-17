@@ -16,7 +16,8 @@
 ├── 05_manual_pdf.md
 ├── 06_manual_viewer.md
 ├── 07_cli_reference.md
-└── 08_cli_quick_recipes.md
+├── 08_cli_quick_recipes.md
+└── 09_manual_composition.md
 ```
 
 ## Outline (Links)
@@ -31,6 +32,7 @@
 - [06_manual_viewer.md — manual_viewer Module](06_manual_viewer.md)
 - [07_cli_reference.md — IRIDIC CLI Command Reference](07_cli_reference.md)
 - [08_cli_quick_recipes.md — Common CLI Workflows (Quick Start)](08_cli_quick_recipes.md)
+- [09_manual_composition.md — Manual Composition](09_manual_composition.md)
 
 ---
 

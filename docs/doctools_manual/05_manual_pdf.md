@@ -276,6 +276,8 @@ The returned Markdown uses the same virtual ordering as the composed viewer.
 For example, generated `example_io` command views can export after authored
 `01_quickstart.md`, `02_usage_guide.md`, and `04_implementation_notes.md` as a
 virtual `05_example_io.md` section. YAML front matter is stripped before export.
+See Manual Composition (`docs/doctools_manual/09_manual_composition.md`) for
+the full source, metadata, virtual-path, and limitation contract.
 
 ---
 
