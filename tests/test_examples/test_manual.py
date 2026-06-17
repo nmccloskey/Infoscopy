@@ -24,6 +24,8 @@ def command_front_matter(
     object_id: str = "transcripts.tabularize",
     view: str = "example_io",
     title: str = "Transcript Tabularization Example",
+    view_label: str = "Example I/O",
+    view_order: int = 50,
 ) -> str:
     return f"""---
 object_type: command
@@ -35,9 +37,32 @@ canonical_command: transcripts tabularize
 module_id: transcripts
 title: {title}
 view: {view}
+view_label: {view_label}
+view_order: {view_order}
+slot: examples
+source_manual: generated_example_io
+generated: true
+---
+
+"""
+
+
+def workflow_front_matter() -> str:
+    return """---
+object_type: workflow
+object_types:
+  - workflow
+  - command
+object_id: full_example_dataset
+workflow_id: full_example_dataset
+command_id: examples
+canonical_command: examples
+command_subtype: omnibus
+typology: omnibus_command_workflow
+title: Full Example Dataset
+view: example_io
 view_label: Example I/O
 view_order: 50
-slot: examples
 source_manual: generated_example_io
 generated: true
 ---
@@ -54,6 +79,19 @@ def test_split_front_matter_parses_yaml_and_returns_body_only() -> None:
     assert metadata["object_id"] == "transcripts.tabularize"
     assert metadata["view"] == "example_io"
     assert body == "# Transcript Tabularization Example\nBody\n"
+
+
+def test_authored_root_only_preserves_physical_tree(tmp_path: Path) -> None:
+    authored = tmp_path / "manual"
+    write(authored / "01_intro.md", "# Intro\nBody.\n")
+    write(authored / "section" / "02_topic.md", "# Topic\nDetails.\n")
+
+    composed = build_composed_manual([authored])
+
+    assert list(composed.flat) == ["01_intro.md", "section/02_topic.md"]
+    assert composed.flat["01_intro.md"].title == "Intro"
+    assert composed.flat["section/02_topic.md"].text == "# Topic\nDetails.\n"
+    assert composed.diagnostics == ()
 
 
 def test_composes_generated_example_io_as_virtual_command_sibling(
@@ -179,6 +217,86 @@ def test_generated_only_views_can_be_grouped_under_generated_root(
     rel = "generated/example_io/transcripts/tabularize.md"
     assert rel in composed.flat
     assert composed.flat[rel].abs_path == generated_doc.resolve()
+
+
+def test_workflow_collection_object_is_retained_without_command_special_case(
+    tmp_path: Path,
+) -> None:
+    generated = tmp_path / "example_io"
+    overview = write(
+        generated / "01_overview.md",
+        workflow_front_matter() + "# Full Example Dataset\nOverview.\n",
+    )
+
+    composed = build_composed_manual(
+        [ManualSource(generated, name="example_io", role="generated")],
+        unmatched_policy="generated_root",
+    )
+
+    rel = "generated/example_io/01_overview.md"
+    assert rel in composed.flat
+    assert composed.flat[rel].abs_path == overview.resolve()
+    assert composed.flat[rel].title == "Example I/O"
+    workflow_views = [
+        view for view in composed.views if view.object_id == "full_example_dataset"
+    ]
+    assert len(workflow_views) == 1
+    assert workflow_views[0].object_type == "workflow"
+    assert workflow_views[0].object_types == ("workflow", "command")
+    assert "No authored anchor for workflow:full_example_dataset" in composed.diagnostics[0]
+
+
+def test_view_order_controls_virtual_generated_sibling_order(
+    tmp_path: Path,
+) -> None:
+    authored = tmp_path / "manual"
+    generated = tmp_path / "example_io"
+    write(
+        authored
+        / "04_modules"
+        / "01_transcripts"
+        / "05_commands"
+        / "01_tabularize"
+        / "01_quickstart.md",
+        "# `transcripts tabularize` Quickstart\nRun it.\n",
+    )
+    write(
+        generated / "transcripts" / "tabularize.md",
+        command_front_matter()
+        + "# Transcript Tabularization Example\nGenerated preview.\n",
+    )
+    write(
+        generated / "transcripts" / "tabularize_appendix.md",
+        command_front_matter(
+            view="appendix",
+            title="Transcript Tabularization Appendix",
+            view_label="Appendix",
+            view_order=60,
+        )
+        + "# Transcript Tabularization Appendix\nExtra detail.\n",
+    )
+
+    composed = build_composed_manual(
+        [
+            ManualSource(authored, name="authored", role="authored"),
+            ManualSource(generated, name="example_io", role="generated"),
+        ],
+        infer_from_paths=True,
+    )
+
+    command_paths = [
+        path
+        for path in composed.flat
+        if path.startswith(
+            "04_modules/01_transcripts/05_commands/01_tabularize/"
+        )
+    ]
+    assert command_paths == [
+        "04_modules/01_transcripts/05_commands/01_tabularize/01_quickstart.md",
+        "04_modules/01_transcripts/05_commands/01_tabularize/05_example_io.md",
+        "04_modules/01_transcripts/05_commands/01_tabularize/06_appendix.md",
+    ]
+    assert composed.flat[command_paths[-1]].title == "Appendix"
 
 
 def test_duplicate_object_view_pairs_raise_deterministic_error(

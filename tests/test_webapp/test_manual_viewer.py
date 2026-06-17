@@ -191,6 +191,58 @@ def test_prepare_manual_root_can_ensure_outline(
     ]
 
 
+def test_prepare_manual_sources_ensures_only_authored_outlines(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authored = tmp_path / "docs" / "manual"
+    generated = tmp_path / "pkg" / "example_io"
+    authored.mkdir(parents=True)
+    generated.mkdir(parents=True)
+    calls: list[Path] = []
+    warnings: list[str] = []
+
+    def fake_ensure_manual_outline(path: Path, **_kwargs: object) -> Path:
+        calls.append(path)
+        return path / "00_outline.md"
+
+    monkeypatch.setattr(viewer, "ensure_manual_outline", fake_ensure_manual_outline)
+    monkeypatch.setattr(viewer, "st", SimpleNamespace(warning=warnings.append))
+
+    specs = viewer._prepare_manual_sources(
+        repo_root=tmp_path,
+        manual_sources=[
+            {
+                "root": "docs/manual",
+                "name": "manual",
+                "role": "authored",
+            },
+            {
+                "root": generated,
+                "name": "example_io",
+                "source_manual": "generated_example_io",
+                "role": "generated",
+            },
+        ],
+        ensure_outline="always",
+        outline_title="Manual",
+        outline_version="1.0",
+        outline_max_depth=2,
+    )
+
+    assert specs == (
+        (str(authored.resolve()), "manual", "authored", "authored"),
+        (
+            str(generated.resolve()),
+            "example_io",
+            "generated_example_io",
+            "generated",
+        ),
+    )
+    assert calls == [authored.resolve()]
+    assert warnings == []
+
+
 def test_build_composed_manual_index_from_specs_adds_virtual_example_io(
     tmp_path: Path,
 ) -> None:
