@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "psair"
-version = "0.0.3a1"
+version = "0.0.3a2"
 description = "Backend scaffolding for documentation, data handling, and analysis-oriented research software."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
