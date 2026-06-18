@@ -82,7 +82,7 @@ The CLI currently focuses on manual/documentation workflows:
 psair tree docs/manual
 psair index docs/manual --show-files
 psair search "topic" docs/manual
-psair outline docs/manual --title "Instruction Manual" --version "0.0.3a1"
+psair outline docs/manual --title "Instruction Manual" --version "0.0.3a2"
 psair chars docs/manual --check-trailing --check-line-endings
 psair pdf docs/manual --non-interactive --force
 ```
