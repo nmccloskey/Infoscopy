@@ -11,7 +11,7 @@ $Python = if ($env:PSAIR_PYTHON) {
 }
 
 if (-not (Test-Path $Python)) {
-    throw "Could not find psair Python at $Python. Set PSAIR_PYTHON to override."
+    throw "Could not find PSAIR Python at $Python. Set PSAIR_PYTHON to override."
 }
 
 & $Python -m pytest @PytestArgs
