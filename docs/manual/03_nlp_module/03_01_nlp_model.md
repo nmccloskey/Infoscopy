@@ -43,7 +43,7 @@ Common install targets are:
 
 ```bash
 pip install "psair[nlp]"
-pip install "psair[nlp-full]"
+pip install "psair[full]"
 ```
 
 ## Loading a spaCy pipeline
@@ -135,13 +135,7 @@ The method:
 Install benepar support with:
 
 ```bash
-pip install "psair[nlp,nlp-parse]"
-```
-
-or:
-
-```bash
-pip install "psair[nlp-full]"
+pip install "psair[full]"
 ```
 
 If benepar is installed but cannot be added to the pipeline, PSAIR raises a
@@ -168,13 +162,7 @@ The dictionary is cached after the first successful load.
 Install this support with:
 
 ```bash
-pip install "psair[nlp-phon]"
-```
-
-or:
-
-```bash
-pip install "psair[nlp-full]"
+pip install "psair[full]"
 ```
 
 ## Practical guidance
