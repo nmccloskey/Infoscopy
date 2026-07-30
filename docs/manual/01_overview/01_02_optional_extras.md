@@ -7,10 +7,7 @@ several areas of functionality, but not every user needs the same dependency
 stack. Optional extras let users install only the dependencies needed for a
 particular workflow.
 
-This matters because the supported documentation tooling, Streamlit viewing,
-ETL helpers, EDA stack, and NLP stack have very different dependency profiles.
-For example, a project that only wants the manual CLI should not have to install
-spaCy, scikit-learn, matplotlib, or Streamlit.
+This matters because the supported documentation tooling, Streamlit viewing, and NLP utilities have different dependency profiles. For example, a project that only wants the manual CLI should not have to install spaCy or Streamlit.
 
 Install extras with standard `pip` syntax:
 
@@ -88,30 +85,6 @@ The repository-level `requirements.txt` installs `.[view]` so the hosted viewer
 can keep the base package dependency-free while still installing the packages
 needed by the app.
 
-## ETL extra
-
-```bash
-pip install "psair[etl]"
-```
-
-The `etl` extra installs dependencies used by the experimental ETL helpers,
-including tabular data and YAML support.
-
-Use this extra only when intentionally working with the alpha ETL modules. These
-modules are not yet considered stable public APIs.
-
-## EDA extra
-
-```bash
-pip install "psair[eda]"
-```
-
-The `eda` extra installs the exploratory data analysis stack, including
-scientific computing, plotting, and spreadsheet dependencies.
-
-Use this extra only for active development against the experimental EDA modules.
-The EDA area is expected to change as PSAIR matures.
-
 ## NLP extra
 
 ```bash
@@ -126,59 +99,6 @@ spaCy language models are not bundled inside the Python package. By default,
 `NLPModel` can attempt to download a requested spaCy model when it is missing.
 For controlled environments, install the model ahead of time or call
 `get_nlp(..., auto_download_model=False)` so missing models fail explicitly.
-
-## NLP processing extra
-
-```bash
-pip install "psair[nlp-process]"
-```
-
-The `nlp-process` extra installs dependencies used by the preprocessing
-workflow: NumPy, pandas, docx2txt, and tqdm. Use it when working with PSAIR's
-file readers and preprocessing pipeline for `.txt`, `.docx`, `.cha`, `.csv`, or
-`.xlsx` inputs.
-
-This extra does not install spaCy by itself. Combine it with `nlp` when the
-workflow needs both file processing and spaCy analysis:
-
-```bash
-pip install "psair[nlp,nlp-process]"
-```
-
-## NLP phonology extra
-
-```bash
-pip install "psair[nlp-phon]"
-```
-
-The `nlp-phon` extra installs NLTK for phonology-oriented resources such as
-CMUdict. Use it when code calls `NLPModel.get_cmu_dict()`.
-
-The CMUdict corpus is downloaded through NLTK data, not bundled in the PSAIR
-wheel. `NLPModel` attempts the NLTK download if the corpus is missing.
-
-## NLP parsing extra
-
-```bash
-pip install "psair[nlp-parse]"
-```
-
-The `nlp-parse` extra installs benepar for constituency parsing support. Use it
-when loading a spaCy pipeline with `require_benepar=True`.
-
-The benepar model is also an external resource. PSAIR attempts to download
-`benepar_en3` when benepar support is requested, but projects with locked-down
-environments should provision that model separately.
-
-## NLP full extra
-
-```bash
-pip install "psair[nlp-full]"
-```
-
-The `nlp-full` extra combines the active NLP dependency groups: spaCy, benepar,
-NLTK, NumPy, pandas, docx2txt, and tqdm. It is the simplest install target for
-contributors working across the NLP model and preprocessing modules.
 
 ## Web extra
 
@@ -253,21 +173,3 @@ For broad experimental development:
 ```bash
 python -m pip install -e ".[full,dev]"
 ```
-
-## Release guidance
-
-The optional extras are part of PSAIR's release hygiene. Before publishing a new
-alpha release, check that each extra still matches the code it is meant to
-support.
-
-At minimum, verify:
-
-- the base package imports without optional dependencies
-- `psair --help` works after the intended documentation install
-- the `docs` extra supports the manual CLI and PDF workflow
-- the `view` extra supports the Streamlit manual viewer
-- experimental extras do not accidentally become required for base imports
-- the `full` extra includes the active optional dependency groups
-
-Because PSAIR is still alpha, the extras may be reorganized in future releases.
-When that happens, update this manual and the README together.
